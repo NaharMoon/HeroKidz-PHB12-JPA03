@@ -1,0 +1,1 @@
+Hero Kidz - Next.js E-commerce Project
