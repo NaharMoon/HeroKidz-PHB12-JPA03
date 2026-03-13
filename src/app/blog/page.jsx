@@ -1,3 +1,4 @@
+import Link from "next/link";
 import Image from "next/image";
 
 export default function BlogPage() {
@@ -82,9 +83,11 @@ export default function BlogPage() {
 
       {/* Author Box */}
       <section className="mt-16 flex items-center gap-4 p-6 bg-base-200 rounded-2xl">
-        <img
-          src="https://i.pravatar.cc/100?img=12"
-          className="w-16 h-16 rounded-full"
+        <Image
+          src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=200&q=80"
+          width={64}
+          height={64}
+          className="h-16 w-16 rounded-full object-cover"
           alt="Author"
         />
         <div>
@@ -101,9 +104,9 @@ export default function BlogPage() {
         <h3 className="text-2xl font-bold mb-4">
           Explore Learning Toys for Your Child
         </h3>
-        <button className="btn btn-primary btn-wide">
+        <Link href="/products" className="btn btn-primary btn-wide">
           Browse Educational Toys
-        </button>
+        </Link>
       </section>
     </main>
   );

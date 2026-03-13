@@ -1,19 +1,29 @@
-import React from "react";
-// import products from "@/data/toys.json";
 import ProductCard from "../carrds/ProductCard";
 import { getProducts } from "@/actions/server/product";
+import SectionHeader from "@/components/ui/SectionHeader";
 
-const Products = async () => {
-  const products = await getProducts();
+const Products = async ({ featuredOnly = false }) => {
+  const products = await getProducts({ featuredOnly });
+
   return (
-    <div>
-      <h2 className="text-center text-4xl font-bold mb-10">Our Products</h2>
+    <div className="space-y-10">
+      <SectionHeader
+        eyebrow={featuredOnly ? "Featured Picks" : "Shop Collection"}
+        title={featuredOnly ? "Popular learning toys for curious kids" : "Browse the HeroKidz collection"}
+        description={featuredOnly ? "Top-rated toys, creative activity kits, and thoughtful gift ideas chosen for playful learning." : "Shop educational toys by age, interest, and category to find the perfect match for every little learner."}
+      />
 
-      <div className="grid md:grid-cols-3 gap-5">
-        {products.map((product) => (
-          <ProductCard key={product.title} product={product}></ProductCard>
-        ))}
-      </div>
+      {products.length ? (
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          {products.map((product) => (
+            <ProductCard key={product._id} product={product} />
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-base-300 bg-base-100 p-10 text-center text-base-content/70">
+          No products available yet. Run the seed script to populate demo data.
+        </div>
+      )}
     </div>
   );
 };

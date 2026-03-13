@@ -1,44 +1,28 @@
 import { getCart } from "@/actions/server/cart";
 import CheckOut from "@/components/home/CheckOut";
-import React from "react";
-import { fontBangla } from "../layout";
-import { TbHorseToy } from "react-icons/tb";
-import Link from "next/link";
+import EmptyState from "@/components/ui/EmptyState";
 
-const checkOutPage = async () => {
+const CheckoutPage = async () => {
   const cartItems = await getCart();
-  const formattedItems = cartItems.map((item) => ({
-    ...item,
-    _id: item._id.toString(),
-  }));
 
   return (
-    <div>
-      {/* title  */}
-      <div className="">
-        <h2 className="text-4xl py-4 font-bold border-l-8 border-primary pl-8">
-          Check Out Page
-        </h2>
+    <div className="space-y-8">
+      <div className="space-y-2">
+        <h1 className="text-4xl font-bold">Checkout</h1>
+        <p className="text-base-content/60">Confirm delivery information, choose payment method, and place your order.</p>
       </div>
-      {cartItems.length == 0 ? (
-        <>
-          <div className="text-center py-20 space-y-5">
-            <h2 className={`${fontBangla.className} text-4xl font-bold`}>
-              আপনি কোন প্রোডাক্ট সিলেক্ট করেন নি
-            </h2>
-            <Link
-              href={"/products"}
-              className="btn btn-primary btn-lg btn-wide"
-            >
-              <TbHorseToy></TbHorseToy> পন্য দেখুন
-            </Link>
-          </div>
-        </>
+
+      {!cartItems.length ? (
+        <EmptyState
+          title="No items selected"
+          description="Your cart is empty, so checkout cannot continue yet."
+          actionLabel="Browse Products"
+        />
       ) : (
-        <CheckOut cartItems={formattedItems}></CheckOut>
+        <CheckOut cartItems={cartItems} />
       )}
     </div>
   );
 };
 
-export default checkOutPage;
+export default CheckoutPage;

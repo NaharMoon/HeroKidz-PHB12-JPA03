@@ -1,26 +1,24 @@
 "use client";
+
 import { signIn } from "next-auth/react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { FaGoogle } from "react-icons/fa";
 
-export const SocialButtons = () => {
+export const SocialButtons = ({ googleEnabled = false }) => {
   const params = useSearchParams();
 
+  if (!googleEnabled) {
+    return <p className="text-center text-sm text-base-content/50">Google login is optional and currently not configured.</p>;
+  }
+
   const handleSignIn = async () => {
-    const result = await signIn("google", {
-      // redirect: "false",
-      callbackUrl: params.get("callbackUrl") || "/",
-    });
+    await signIn("google", { callbackUrl: params.get("callbackUrl") || "/" });
   };
 
   return (
-    <div className="flex gap-3 mt-4">
-      <button
-        onClick={handleSignIn}
-        className="btn btn-outline btn-error flex-1"
-      >
-        <FaGoogle className="text-lg" />
-        Google
+    <div className="mt-4">
+      <button onClick={handleSignIn} className="btn btn-outline w-full">
+        <FaGoogle className="text-lg" /> Continue with Google
       </button>
     </div>
   );

@@ -1,27 +1,30 @@
 "use client";
 
-import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
+import { signOut, useSession } from "next-auth/react";
 
 const AuthButtons = () => {
-  const session = useSession();
+  const { status, data } = useSession();
+
+  if (status === "loading") {
+    return <button className="btn btn-ghost" disabled>Loading...</button>;
+  }
+
+  if (status === "authenticated") {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="hidden text-sm text-base-content/70 md:inline">{data?.user?.name}</span>
+        <button onClick={() => signOut({ callbackUrl: "/" })} className="btn btn-outline btn-primary">
+          Logout
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div>
-      {session.status == "authenticated" ? (
-        <>
-          <button onClick={() => signOut()} className="btn btn-primary ">
-            Log Out
-          </button>
-        </>
-      ) : (
-        <>
-          {" "}
-          <Link href={"/login"}>
-            <button className="btn btn-primary btn-outline">Login</button>
-          </Link>
-        </>
-      )}
-    </div>
+    <Link href="/login" className="btn btn-outline btn-primary">
+      Login
+    </Link>
   );
 };
 

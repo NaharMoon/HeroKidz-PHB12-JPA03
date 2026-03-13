@@ -1,12 +1,8 @@
 import LoginForm from "@/components/auth/LoginForm";
-import React from "react";
+import { googleAuthEnabled } from "@/lib/authOptions";
 
 const LoginPage = () => {
-  return (
-    <div>
-      <LoginForm></LoginForm>
-    </div>
-  );
+  return <LoginForm googleEnabled={googleAuthEnabled} />;
 };
 
 export default LoginPage;

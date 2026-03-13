@@ -1,58 +1,55 @@
 "use client";
-import { handleCart } from "@/actions/server/cart";
+
+import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { usePathname } from "next/navigation";
-import { useRouter } from "next/navigation";
-import React, { useState } from "react";
 import { FaCartPlus } from "react-icons/fa";
 import Swal from "sweetalert2";
+import { handleCart } from "@/actions/server/cart";
 
 const CartButton = ({ product }) => {
-  const session = useSession();
-  const path = usePathname();
+  const { status } = useSession();
+  const pathname = usePathname();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const islogin = session?.status == "authenticated";
 
-  const handleAdd2Cart = async () => {
-    setIsLoading(true);
-    if (islogin) {
-      const result = await handleCart(product._id);
-      if (result.success) {
-        Swal.fire({
-          title: "Added to Cart",
-          text: `${product.title} কার্টে যুক্ত করা হয়েছে`,
-          icon: "success",
-          showCancelButton: true,
-          confirmButtonColor: "#3085d6",
-          cancelButtonColor: "#d33",
-          cancelButtonText: "আরো কিনতে চাই",
-          confirmButtonText: "চেকআউট করুন",
-        }).then((res) => {
-          if (res.isConfirmed) router.push("/cart");
-        });
-        // Swal.fire("Added to Cart", product?.title, "success");
-      } else {
-        Swal.fire("Opps", "Something Wrong Happen", "error");
-      }
-      setIsLoading(false);
-    } else {
-      router.push(`/login?callbackUrl=${path}`);
-      setIsLoading(false);
+  const handleAddToCart = async () => {
+    if (status !== "authenticated") {
+      router.push(`/login?callbackUrl=${pathname}`);
+      return;
     }
+
+    setIsLoading(true);
+    const result = await handleCart(product._id);
+    setIsLoading(false);
+
+    if (result.success) {
+      router.refresh();
+      Swal.fire({
+        title: "Added to cart",
+        text: `${product.title} has been added to your cart.`,
+        icon: "success",
+        showCancelButton: true,
+        confirmButtonText: "Go to cart",
+        cancelButtonText: "Keep shopping",
+      }).then((res) => {
+        if (res.isConfirmed) router.push("/cart");
+      });
+      return;
+    }
+
+    Swal.fire("Unable to add item", result.message || "Something went wrong.", "error");
   };
 
   return (
-    <div>
-      <button
-        disabled={session.status == "loading" || isLoading}
-        onClick={handleAdd2Cart}
-        className="btn btn-primary w-full flex gap-2"
-      >
-        <FaCartPlus />
-        Add to Cart
-      </button>
-    </div>
+    <button
+      disabled={status === "loading" || isLoading || product.stock === 0}
+      onClick={handleAddToCart}
+      className="btn btn-primary w-full"
+    >
+      <FaCartPlus />
+      {product.stock === 0 ? "Out of stock" : isLoading ? "Adding..." : "Add to Cart"}
+    </button>
   );
 };
 

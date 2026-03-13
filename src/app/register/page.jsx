@@ -1,12 +1,8 @@
 import { RegisterForm } from "@/components/auth/RegisterForm";
-import React from "react";
+import { googleAuthEnabled } from "@/lib/authOptions";
 
 const RegisterPage = () => {
-  return (
-    <div>
-      <RegisterForm></RegisterForm>
-    </div>
-  );
+  return <RegisterForm googleEnabled={googleAuthEnabled} />;
 };
 
 export default RegisterPage;

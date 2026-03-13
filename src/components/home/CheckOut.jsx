@@ -1,30 +1,38 @@
 "use client";
 
-import { createOrder } from "@/actions/server/Order";
-import { useSession } from "next-auth/react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useState, useMemo, useEffect } from "react";
-import { AiOutlineLoading } from "react-icons/ai";
+import { useSession } from "next-auth/react";
 import Swal from "sweetalert2";
+import { createOrder } from "@/actions/server/Order";
+import { formatCurrency } from "@/lib/format";
 
 const CheckOut = ({ cartItems = [] }) => {
-  const session = useSession();
+  const { status, data } = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
   const totalItems = useMemo(
-    () => cartItems.reduce((sum, item) => sum + item.quantity, 0),
+    () => cartItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
     [cartItems]
   );
 
-  const totalPrice = useMemo(
-    () => cartItems.reduce((sum, item) => sum + item.quantity * item.price, 0),
+  const subtotal = useMemo(
+    () =>
+      cartItems.reduce(
+        (sum, item) =>
+          sum + Number(item.quantity || 0) * Number(item.price || 0),
+        0
+      ),
     [cartItems]
   );
+
+  const shipping = cartItems.length ? 120 : 0;
+  const totalPrice = subtotal + shipping;
 
   const handleSubmit = async (e) => {
-    setLoading(true);
     e.preventDefault();
+    setLoading(true);
 
     const form = e.target;
 
@@ -34,143 +42,234 @@ const CheckOut = ({ cartItems = [] }) => {
       contact: form.contactNo.value,
       address: form.deliveryInfo.value,
       instruction: form.specialInstruction.value,
+      paymentMethod: form.paymentMethod.value,
     };
-    console.log(payload);
 
-    const result = await createOrder(payload);
-    if (result.success) {
+    try {
+      if (payload.paymentMethod === "stripe") {
+        const stripePayload = {
+          fullName: payload.name,
+          email: payload.email,
+          phone: payload.contact,
+          address: payload.address,
+          notes: payload.instruction,
+          items: cartItems.map((item) => ({
+            _id: item._id,
+            productId: item.productId || item._id,
+            title: item.title,
+            price: Number(item.price || 0),
+            quantity: Number(item.quantity || 1),
+            image: item.image || "",
+            category: item.category || "",
+          })),
+          subtotal,
+          shipping,
+          total: totalPrice,
+        };
+
+        const response = await fetch("/api/stripe/checkout", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(stripePayload),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || "Failed to start Stripe checkout.");
+        }
+
+        if (result.url) {
+          window.location.href = result.url;
+          return;
+        }
+
+        throw new Error("Stripe checkout URL was not returned.");
+      }
+
+      const result = await createOrder(payload);
+
+      if (result.success) {
+        await Swal.fire(
+          "Order placed",
+          "Your order has been placed successfully.",
+          "success"
+        );
+        router.push(result.redirectTo || "/orders");
+        router.refresh();
+        return;
+      }
+
       Swal.fire(
-        "অর্ডার সম্পন্ন হলো",
-        "অর্ডার টি ৭ দিনের ভেতর আপনার কাছে পৌছে যাবে। ইমেইল চেক করুন।",
-        "success"
+        "Unable to place order",
+        result.message || "Something went wrong.",
+        "error"
       );
-
-      router.push("/");
-    } else {
-      Swal.fire("error", "Something Went wrong", "error");
-      router.push("/cart");
+    } catch (error) {
+      console.error("Checkout error:", error);
+      Swal.fire(
+        "Checkout failed",
+        error.message || "Something went wrong.",
+        "error"
+      );
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  if (session.status == "loading") {
-    return <h2>Loading..</h2>;
-  }
+  if (status === "loading") return <p>Loading checkout...</p>;
 
   return (
-    <div className="flex relative gap-10 py-20 flex-col-reverse  md:flex-row ">
-      <div
-        className={` ${
-          loading ? " flex opacity-80 inset-0 absolute" : "hidden"
-        }  z-20 glass w-full  h-full  justify-center items-center gap-4`}
+    <div className="grid gap-8 lg:grid-cols-[1.3fr_0.9fr]">
+      <form
+        className="space-y-5 rounded-[2rem] border border-base-300 bg-base-100 p-6 shadow-sm"
+        onSubmit={handleSubmit}
       >
-        <AiOutlineLoading
-          size={50}
-          className="animate-spin text-primary font-bold"
-        />
-        <h2 className={`text-xl font-bold animate-pulse`}>
-          {" "}
-          Processing CheckOut{" "}
-        </h2>
-      </div>
-      {/* LEFT: FORM */}
-      <div className="flex-2">
-        <h2 className="text-2xl font-bold my-4">Delivery Information</h2>
-        <form
-          className="space-y-4 bg-base-100 p-6 shadow-md rounded-lg"
-          onSubmit={handleSubmit}
-        >
-          {/* NAME + EMAIL IN ONE ROW */}
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <label className="block font-medium mb-1">Name</label>
-              <input
-                type="text"
-                name="name"
-                value={session?.data?.user?.name}
-                // onChange={handleChange}
-                className="input input-bordered w-full"
-                required
-                readOnly
-              />
-            </div>
-            <div className="flex-1">
-              <label className="block font-medium mb-1">Email</label>
-              <input
-                type="email"
-                name="email"
-                value={session?.data?.user?.email}
-                className="input input-bordered w-full"
-                required
-                readOnly
-              />
-            </div>
-          </div>
+        <div>
+          <h2 className="text-2xl font-bold">Delivery Information</h2>
+          <p className="mt-1 text-sm text-base-content/60">
+            Please confirm your contact, address, and preferred payment method
+            before placing the order.
+          </p>
+        </div>
 
+        <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <label className="block font-medium mb-1">
-              Delivery Information
+            <label className="label">
+              <span className="label-text">Name</span>
             </label>
-            <textarea
-              name="deliveryInfo"
-              className="textarea textarea-bordered w-full"
-              rows={3}
-              required
-            ></textarea>
-          </div>
-
-          <div>
-            <label className="block font-medium mb-1">
-              Special Instruction
-            </label>
-            <textarea
-              name="specialInstruction"
-              className="textarea textarea-bordered w-full"
-              rows={2}
-            ></textarea>
-          </div>
-
-          <div>
-            <label className="block font-medium mb-1">Contact No</label>
             <input
-              type="tel"
-              name="contactNo"
+              type="text"
+              name="name"
+              defaultValue={data?.user?.name || ""}
               className="input input-bordered w-full"
               required
             />
           </div>
+          <div>
+            <label className="label">
+              <span className="label-text">Email</span>
+            </label>
+            <input
+              type="email"
+              name="email"
+              defaultValue={data?.user?.email || ""}
+              className="input input-bordered w-full"
+              required
+              readOnly
+            />
+          </div>
+        </div>
 
-          <button
-            disabled={cartItems.length == 0 || loading}
-            type="submit"
-            className="btn btn-primary w-full mt-4"
-          >
-            Check Out with Cash on Delivery
-          </button>
-        </form>
-      </div>
+        <div>
+          <label className="label">
+            <span className="label-text">Delivery Address</span>
+          </label>
+          <textarea
+            name="deliveryInfo"
+            className="textarea textarea-bordered w-full"
+            rows={4}
+            required
+          />
+        </div>
 
-      {/* RIGHT: ITEMS SUMMARY */}
-      <div className="flex-1 ">
-        <h2 className="text-2xl font-bold mb-4">Order Summary</h2>
-        <div className="bg-base-100 p-4 shadow-md rounded-lg space-y-2 sticky top-4">
+        <div>
+          <label className="label">
+            <span className="label-text">Special Instruction</span>
+          </label>
+          <textarea
+            name="specialInstruction"
+            className="textarea textarea-bordered w-full"
+            rows={3}
+          />
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="label">
+              <span className="label-text">Contact Number</span>
+            </label>
+            <input
+              type="tel"
+              name="contactNo"
+              className="input input-bordered w-full"
+              placeholder="01XXXXXXXXX"
+              required
+            />
+          </div>
+          <div>
+            <label className="label">
+              <span className="label-text">Payment Method</span>
+            </label>
+            <select
+              name="paymentMethod"
+              className="select select-bordered w-full"
+              defaultValue="cod"
+            >
+              <option value="cod">Cash on Delivery</option>
+              <option value="stripe">Stripe Checkout</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="rounded-2xl bg-base-200/70 p-4 text-sm text-base-content/70">
+          <p className="font-semibold text-base-content">Payment notes</p>
+          <p className="mt-1">
+            Cash on Delivery places the order instantly. Stripe Checkout
+            redirects you to Stripe&apos;s secure payment page before your order
+            is confirmed as paid.
+          </p>
+        </div>
+
+        <button
+          disabled={!cartItems.length || loading}
+          type="submit"
+          className="btn btn-primary w-full"
+        >
+          {loading ? "Processing..." : "Continue to Place Order"}
+        </button>
+      </form>
+
+      <div className="h-fit rounded-[2rem] border border-base-300 bg-base-100 p-6 shadow-sm lg:sticky lg:top-24">
+        <h2 className="text-2xl font-bold">Order Summary</h2>
+
+        <div className="mt-5 space-y-4">
           {cartItems.map((item) => (
-            <div key={item._id} className="flex justify-between border-b pb-1">
+            <div
+              key={item._id}
+              className="flex justify-between gap-4 border-b border-base-300 pb-3 text-sm last:border-none last:pb-0"
+            >
               <div>
                 <p className="font-medium">{item.title}</p>
-                <p className="text-xs text-gray-500">
-                  Qty: {item.quantity} × ৳{item.price}
+                <p className="text-base-content/60">
+                  Qty: {item.quantity} × {formatCurrency(item.price)}
                 </p>
               </div>
-              <p className="font-semibold">৳{item.quantity * item.price}</p>
+              <p className="font-semibold">
+                {formatCurrency(Number(item.quantity || 0) * Number(item.price || 0))}
+              </p>
             </div>
           ))}
+        </div>
 
-          <div className="divider"></div>
-
-          <div className="flex justify-between font-bold text-lg">
-            <span>Total ({totalItems} items)</span>
-            <span>৳{totalPrice}</span>
+        <div className="mt-5 space-y-2 border-t border-base-300 pt-4 text-sm">
+          <div className="flex justify-between">
+            <span>Total Items</span>
+            <span>{totalItems}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Subtotal</span>
+            <span>{formatCurrency(subtotal)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Shipping</span>
+            <span>{formatCurrency(shipping)}</span>
+          </div>
+          <div className="flex justify-between text-lg font-bold">
+            <span>Total</span>
+            <span className="text-primary">{formatCurrency(totalPrice)}</span>
           </div>
         </div>
       </div>

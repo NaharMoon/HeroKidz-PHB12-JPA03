@@ -1,143 +1,123 @@
-import { getSingleProduct } from "@/actions/server/product";
-import { fontBangla } from "@/app/layout";
+import { notFound } from "next/navigation";
 import CartButton from "@/components/buttons/CartButton";
-
-import Image from "next/image";
-import React from "react";
-import { FaCartPlus, FaStar } from "react-icons/fa";
+import ProductCard from "@/components/carrds/ProductCard";
+import ProductGallery from "@/components/store/ProductGallery";
+import ReviewSection from "@/components/store/ReviewSection";
+import WishlistButton from "@/components/store/WishlistButton";
+import StarRating from "@/components/ui/StarRating";
+import { getRelatedProducts, getSingleProduct } from "@/actions/server/product";
+import { isWishlisted } from "@/actions/server/wishlist";
+import { formatCurrency, getDiscountedPrice } from "@/lib/format";
 
 export async function generateMetadata({ params }) {
   const { id } = await params;
-  const product = await getSingleProduct(id); // DB / API fetch
-
+  const product = await getSingleProduct(id);
+  if (!product) return { title: "Product not found" };
   return {
     title: product.title,
-    description:
-      product.description.slice(0, 160) ||
-      "Educational toy designed to help kids learn through play.",
-
-    openGraph: {
-      title: product.title,
-      description:
-        "Fun and educational learning toy for kids. Safe, colorful, and engaging.",
-      images: [
-        {
-          url: product.image || "https://i.ibb.co.com/Ld7J2ZYq/image.png",
-          width: 1200,
-          height: 630,
-          alt: product.title,
-        },
-      ],
-    },
-
-    twitter: {
-      card: "summary_large_image",
-      title: product.title,
-      description: "Fun and educational learning toy for kids.",
-      images: [product.image || "https://i.ibb.co.com/Ld7J2ZYq/image.png"],
-    },
+    description: product.description?.slice(0, 155),
   };
 }
 
 const ProductDetails = async ({ params }) => {
   const { id } = await params;
   const product = await getSingleProduct(id);
-  console.log(product);
+  if (!product) notFound();
 
-  const {
-    title,
-    image,
-    price,
-    discount,
-    ratings,
-    reviews,
-    sold,
-    description,
-    info,
-    qna,
-  } = product;
-
-  const discountedPrice = price - (price * discount) / 100;
+  const relatedProducts = await getRelatedProducts(product, 4);
+  const wishlisted = await isWishlisted(id);
+  const discountedPrice = getDiscountedPrice(product.price, product.discount || 0);
 
   return (
-    <div
-      className={`  max-w-6xl mx-auto p-6 grid grid-cols-1 md:grid-cols-2 gap-10`}
-    >
-      {/* Image */}
-      <div className="rounded-xl overflow-hidden ">
-        <Image
-          width={600}
-          height={420}
-          src={image}
-          alt={title}
-          className="w-full h-[420px] object-cover"
-        />
-      </div>
+    <div className="space-y-8">
+      <div className="grid gap-10 lg:grid-cols-[1.1fr_1fr]">
+        <ProductGallery images={product.gallery?.length ? product.gallery : [product.image]} title={product.title} />
 
-      {/* Info */}
-      <div>
-        <h1 className="text-3xl font-bold mb-3">{title}</h1>
-
-        {/* Rating */}
-        <div className="flex items-center gap-2 mb-4">
-          <div className="flex text-yellow-400">
-            {Array.from({ length: 5 }, (_, i) => (
-              <FaStar
-                key={i}
-                className={i < Math.round(ratings) ? "" : "opacity-30"}
-              />
-            ))}
+        <div className="space-y-6 rounded-[2rem] border border-base-300 bg-base-100 p-6 shadow-sm">
+          <div className="space-y-2">
+            <span className="badge badge-primary badge-outline">{product.category || "Educational Toy"}</span>
+            <h1 className="text-3xl font-bold">{product.title}</h1>
+            <p className="text-sm text-base-content/60">Recommended age: {product.ageRange || "3-6 years"}</p>
           </div>
-          <span className="text-sm text-gray-600">
-            {ratings} ({reviews} reviews) • {sold} sold
-          </span>
-        </div>
 
-        {/* Price */}
-        <div className="mb-4">
-          <span className="text-2xl font-bold text-primary">
-            ৳{discountedPrice}
-          </span>
-          {discount > 0 && (
-            <span className="line-through text-gray-400 ml-3">৳{price}</span>
-          )}
-        </div>
+          <div className="flex flex-wrap items-center gap-3 text-sm text-base-content/70">
+            <StarRating value={product.ratings || 4.5} />
+            <span>{product.reviews} reviews</span>
+            <span>{product.sold} sold</span>
+          </div>
 
-        {/* Actions */}
-        <CartButton
-          product={{ ...product, _id: product._id.toString() }}
-        ></CartButton>
-        {/* Key Features */}
-        <div className="mt-6">
-          <h3 className="font-semibold mb-2">Key Features</h3>
-          <ul className="list-disc list-inside space-y-1">
-            {info?.map((item, i) => (
-              <li key={i}>{item}</li>
-            ))}
-          </ul>
+          <div className="space-y-1">
+            <p className="text-3xl font-bold text-primary">{formatCurrency(discountedPrice)}</p>
+            {product.discount > 0 ? <p className="text-base-content/50 line-through">{formatCurrency(product.price)}</p> : null}
+            <p className={`text-sm font-medium ${product.stock > 0 ? "text-success" : "text-error"}`}>
+              {product.stock > 0 ? `${product.stock} items available` : "Currently out of stock"}
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <CartButton product={product} />
+            <WishlistButton product={product} initialActive={wishlisted} fullWidth />
+          </div>
+
+          <div className="grid gap-3 rounded-2xl bg-base-200/70 p-5 md:grid-cols-2">
+            <div>
+              <p className="text-xs uppercase tracking-[0.18em] text-base-content/50">Brand</p>
+              <p className="mt-1 font-semibold">{product.brand || "HeroKidz"}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-[0.18em] text-base-content/50">Badge</p>
+              <p className="mt-1 font-semibold">{product.badge || "Featured"}</p>
+            </div>
+          </div>
+
+          <div className="space-y-3 rounded-2xl bg-base-200/70 p-5">
+            <h3 className="text-lg font-semibold">Key Features</h3>
+            <ul className="list-disc space-y-2 pl-5 text-base-content/75">
+              {product.info?.map((item, i) => <li key={i}>{item}</li>)}
+            </ul>
+          </div>
         </div>
       </div>
-      <div className="col-span-full">
-        {/* Description */}
-        <div className="mt-8 space-y-4 text-gray-700 leading-relaxed">
-          {description?.split("\n\n").map((para, idx) => (
-            <p key={idx}>{para}</p>
-          ))}
-        </div>
 
-        {/* Q&A */}
-        <div className="mt-8">
-          <h3 className="font-semibold mb-3">Q & A</h3>
-          <div className="space-y-3">
-            {qna?.map((item, i) => (
-              <div key={i} className="border rounded-lg p-3">
-                <p className="font-medium">{item.question}</p>
-                <p className="text-sm text-gray-600 mt-1">{item.answer}</p>
+      <section className="rounded-[2rem] border border-base-300 bg-base-100 p-6 shadow-sm">
+        <h3 className="text-2xl font-bold">Description</h3>
+        <div className="mt-4 space-y-4 leading-7 text-base-content/75">
+          {product.description?.split("\n\n").map((para, idx) => <p key={idx}>{para}</p>)}
+        </div>
+      </section>
+
+      {product.qna?.length ? (
+        <section className="rounded-[2rem] border border-base-300 bg-base-100 p-6 shadow-sm">
+          <h3 className="text-2xl font-bold">Questions & Answers</h3>
+          <div className="mt-4 space-y-3">
+            {product.qna.map((item, i) => (
+              <div key={i} className="rounded-2xl border border-base-300 p-4">
+                <p className="font-semibold">Q: {item.question}</p>
+                <p className="mt-2 text-base-content/70">A: {item.answer}</p>
               </div>
             ))}
           </div>
-        </div>
-      </div>
+        </section>
+      ) : null}
+
+      <ReviewSection
+        productId={product._id}
+        reviews={product.reviewList || []}
+        averageRating={product.ratings || 0}
+        totalReviews={product.reviews || 0}
+      />
+
+      {relatedProducts.length ? (
+        <section className="space-y-6">
+          <div>
+            <h3 className="text-3xl font-bold">Related Products</h3>
+            <p className="mt-2 text-base-content/60">More picks from the same category.</p>
+          </div>
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+            {relatedProducts.map((item) => <ProductCard key={item._id} product={item} />)}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 };

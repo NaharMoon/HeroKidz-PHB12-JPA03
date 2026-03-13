@@ -1,6 +1,10 @@
 import nodemailer from "nodemailer";
 
 export const sendEmail = async ({ to, subject, html }) => {
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS || !to) {
+    return { skipped: true };
+  }
+
   const transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
     port: 587,
@@ -12,9 +16,11 @@ export const sendEmail = async ({ to, subject, html }) => {
   });
 
   await transporter.sendMail({
-    from: `"Hero Kidz" <${process.env.EMAIL_USER}>`,
+    from: `"HeroKidz" <${process.env.EMAIL_USER}>`,
     to,
     subject,
     html,
   });
+
+  return { skipped: false };
 };
